@@ -11,19 +11,28 @@ Before building the frontend, a Python web API server must be created to expose 
 
 ### 1.1 Required API Endpoints
 
-| HTTP Method | Endpoint | Purpose | Backend Function |
-|-------------|----------|---------|------------------|
-| GET | `/api/tasks` | Fetch all tasks | `task_manager.get_all_tasks(include_completed=False)` |
-| GET | `/api/tasks/completed` | Fetch completed tasks | `task_manager.get_completed_tasks()` |
-| GET | `/api/task/{id}` | Get task details | `task_manager.get_task_summary(task_id)` |
-| GET | `/api/active` | Get active task | `task_manager.get_active_task_summary()` |
-| POST | `/api/start/{id}` | Start timing a task | `task_manager.start_work_on_task(task_id, api_token)` |
-| POST | `/api/stop/{id}` | Stop timing a task | `task_manager.stop_work_on_task(task_id)` |
-| POST | `/api/complete/{id}` | Mark task complete | `task_manager.complete_task(task_id, api_token)` |
-| GET | `/api/time/{id}` | Get total time for task | `time_tracking.get_total_time_for_task(task_id)` |
-| GET | `/api/sync` | Sync with Todoist | `todoist_sync.sync_tasks(api_token)` |
+| HTTP Method | Endpoint | Auth | Purpose | Backend Function |
+|-------------|----------|------|---------|------------------|
+| GET | `/api/tasks` | Optional | Fetch all tasks | `task_manager.get_all_tasks(include_completed=False)` |
+| GET | `/api/tasks/completed` | Optional | Fetch completed tasks | `task_manager.get_completed_tasks()` |
+| GET | `/api/task/{id}` | Optional | Get task details | `task_manager.get_task_summary(task_id)` |
+| GET | `/api/active` | Optional | Get active task | `task_manager.get_active_task_summary()` |
+| POST | `/api/start/{id}` | Required | Start timing a task | `task_manager.start_work_on_task(task_id, api_token)` |
+| POST | `/api/stop/{id}` | Optional | Stop timing a task | `task_manager.stop_work_on_task(task_id)` |
+| POST | `/api/complete/{id}` | Required | Mark task complete | `task_manager.complete_task(task_id, api_token)` |
+| GET | `/api/time/{id}` | Optional | Get total time for task | `time_tracking.get_total_time_for_task(task_id)` |
+| GET | `/api/sync` | Required | Sync with Todoist | `todoist_sync.sync_tasks(api_token)` |
 
-### 1.2 API Response Format
+**Note:** Auth = Bearer token in Authorization header required for endpoints that interact with Todoist.
+
+### 1.2 API Authentication
+
+**DECISION (user):** API token is sent via Authorization header.
+
+- Send API token in `Authorization: Bearer {token}` HTTP header
+- Required for endpoints that interact with Todoist (start, complete, sync)
+
+### 1.3 API Response Format
 All endpoints should return JSON with consistent structure:
 ```json
 {
@@ -33,7 +42,7 @@ All endpoints should return JSON with consistent structure:
 }
 ```
 
-### 1.3 Task Object Structure
+### 1.4 Task Object Structure
 ```json
 {
   "id": "string",
@@ -58,33 +67,47 @@ The interface shall be minimalistic with the following elements centered on the 
 ### 2.1 Task Display Area
 - **Task Title**: Large, prominent text showing current task `content`
 - **Task Description** (optional): Smaller text below title if `description` exists
+- **Progress Indicator**: Position in task list (e.g., "3 of 10")
 - **Due Date** (optional): Subheading if `due_date` exists
-- **Progress Indicator**: Visual cue for current position in task list (e.g., "3 of 10")
+- **Total Time** (completed tasks only): Total time spent displayed as subheading
+
+**DECISION (user):** Progress indicator is shown as "X of Y" in the task display area.
 
 ### 2.2 Control Buttons
-All buttons should be large, touch-friendly, with clear icons or text:
+All buttons should be large, touch-friendly, with clear text symbols:
 
-| Button | Icon/Symbol | Action | Default State |
-|--------|-------------|--------|---------------|
-| Previous | `<-` or left arrow | Navigate to previous task in list | Disabled at first task |
-| Next | `->` or right arrow | Navigate to next task in list | Disabled at last task |
-| Play | `▶` or play icon | Start timing current task | Disabled if task already active |
-| Stop | `||` or pause icon | Pause/stop timing current task | Disabled if no active task |
-| Done | `✓` or checkmark | Mark task complete | Always enabled |
+**DECISION (user):** Use text symbols for all buttons.
+
+| Button | Symbol | Action | Default State |
+|--------|--------|--------|---------------|
+| Previous | `<-` | Navigate to previous task in list | Always enabled (wraps) |
+| Next | `->` | Navigate to next task in list | Always enabled (wraps) |
+| Play | `▶` | Start timing current task | Disabled if task already active |
+| Stop | `||` | Pause/stop timing current task | Disabled if no active task |
+| Done | `✓` | Mark task complete / Toggle done view | Always enabled |
+
+**DECISION (user):** Navigation wraps around (circular) - left arrow at first item goes to last item, right arrow at last item goes to first item.
 
 ### 2.3 Layout Structure
+
+**DECISION (user):** Two-row layout with navigation controls on top row, action buttons on bottom row.
+
 ```
 +----------------------------------+
 |           (empty space)          |
 |                                  |
-|        [ Task Title Here ]       |
-|     (Task Description, etc.)     |
+|   [<-]   [ Task Display ]   [->] |
+|        (title + description)      |
 |                                  |
-|   [<-]  [▶] [||]  [✓]  [->]     |
+|          [▶]  [||]  [✓]         |
+|         (action button row)       |
 |                                  |
 |           (empty space)          |
 +----------------------------------+
 ```
+
+- **Top Row**: Left arrow, Task Display (centered), Right arrow
+- **Bottom Row**: Play, Stop, Done buttons (centered)
 
 ---
 
@@ -104,11 +127,14 @@ The frontend must maintain the following client-side state:
 | `currentSessionDuration` | Number | Seconds for current active session |
 
 ### 3.2 Initial Load Sequence
+
+**DECISION (user):** Resume active task if one exists, otherwise show first incomplete task.
+
 1. Fetch API token (from localStorage, URL param, or user prompt)
 2. Fetch task lists via `/api/tasks` and `/api/tasks/completed`
 3. Fetch active task via `/api/active`
-4. Display first incomplete task (or resume active task)
-5. Start polling for timer updates
+4. If active task exists, display it (resume); otherwise display first incomplete task
+5. Start polling for timer updates (if any active task)
 
 ### 3.3 Navigation Behavior
 
@@ -140,6 +166,8 @@ The frontend must maintain the following client-side state:
 
 ### 3.5 Task Completion
 
+**DECISION (user):** Done button supports both single-click and double-click actions. Requires ~300ms delay to distinguish single vs double click.
+
 #### Done Button (Single Click)
 1. If task is active, stop timing first
 2. Call `POST /api/complete/{task_id}`
@@ -148,37 +176,50 @@ The frontend must maintain the following client-side state:
 5. Show brief "Task completed!" confirmation
 
 #### Done Button (Double Click)
+
+**DECISION (user):** Completed tasks displayed newest first (most recently completed).
+
 1. Toggle `viewingDone` state
 2. If entering done view:
-   - Load completed tasks
-   - Display first completed task
+   - Load completed tasks (sorted newest first by `completed_at`)
+   - Display most recently completed task
    - Show total time as subheading
 3. If exiting done view:
    - Return to incomplete task view
    - Display previous incomplete task
 
 ### 3.6 Time Display for Completed Tasks
+
+**DECISION (user):** No timer display for active/incomplete tasks.
+
 When viewing done tasks, each task should show:
 - Task title (as usual)
 - **Total Time Spent**: Formatted as "Xh Ym Zs" or similar human-readable format
   - Retrieved via `GET /api/time/{task_id}`
   - Fetched when displaying each completed task
+  - Displayed as a subheading below the task title
 
 ### 3.7 Timer Updates
-- Poll `/api/active` every 1-2 seconds when a task is active
-- Update displayed time in real-time
-- Update session duration display if shown
+
+**DECISION (user):** No timer display, so polling is only needed for internal state tracking.
+
+- Poll `/api/active` every 10-30 seconds when a task is active to detect state changes
+- No real-time time display needed (user decision)
+- Update button states if active task changes
 
 ---
 
 ## 4. JavaScript Architecture
 
 ### 4.1 File Structure
+
+**Location:** At project root for serving by web server.
+
 ```
-frontend/
-├── index.html          # Main HTML file
-├── styles.css          # Minimalistic styling
-└── app.js              # All application logic
+# Root directory (PiTodoist/)
+index.html          # Main HTML file
+styles.css          # Minimalistic styling
+app.js              # All application logic
 ```
 
 ### 4.2 Key JavaScript Functions
@@ -234,15 +275,18 @@ function showSuccess(message) { }
 - **Centered Layout**: All content vertically and horizontally centered
 - **Responsive**: Adapts to various screen sizes
 
-### 5.2 Color Scheme (Suggested)
-- Background: Dark or light neutral
-- Task Text: High contrast
-- Active Task: Subtle highlight or indicator
+### 5.2 Color Scheme
+
+**DECISION (user):** Light theme.
+
+- Background: White/light neutral (#ffffff or similar)
+- Task Text: High contrast dark (#000000 or similar)
+- Active Task: Subtle highlight or indicator (e.g., light border or background tint)
 - Buttons: Distinct colors for different actions
   - Play: Green/Primary action color
   - Stop: Orange/Yellow
   - Done: Blue/Success color
-  - Navigation: Neutral
+  - Navigation: Neutral (gray)
 
 ### 5.3 Typography
 - Task Title: Large, bold (24-32px)
@@ -296,13 +340,20 @@ function showSuccess(message) { }
 ## 8. Technical Considerations
 
 ### 8.1 API Token Storage
+
+**DECISION (user):** Prompt user for API token on first visit, store in localStorage for persistence.
+
 - Store in localStorage for persistence
-- Consider URL parameter for initial setup
-- Provide way to update token if invalid
+- Prompt user via browser dialog on first visit if no token found
+- Provide way to update token if invalid (via prompt or settings button)
+- Consider URL parameter for initial setup (optional fallback)
 
 ### 8.2 Polling vs WebSockets
-- Initial implementation: Simple polling (1-2s interval)
-- Future: WebSocket for real-time updates
+
+**DECISION (user):** No timer display, so polling can be infrequent.
+
+- Initial implementation: Simple polling (10-30s interval) for state changes only
+- Future: WebSocket for real-time updates (if needed)
 
 ### 8.3 Offline Support (Future)
 - Cache task data locally
@@ -313,10 +364,12 @@ function showSuccess(message) { }
 
 ## 9. Dependencies
 
-### 9.1 External Libraries (Minimal)
-- None required for basic implementation
-- Optional: Font Awesome for icons
-- Optional: Axios for cleaner API calls
+### 9.1 External Libraries
+
+**DECISION (user):** Using text symbols for buttons, no icon library needed.
+
+- None required for basic implementation (using text symbols)
+- Optional: Axios for cleaner API calls (vanilla fetch is sufficient)
 
 ### 9.2 Browser Support
 - Modern browsers (ES6+)

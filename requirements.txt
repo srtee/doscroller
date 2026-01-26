@@ -1,0 +1,8 @@
+# PiTodoist - Requirements
+
+# Web framework
+flask>=3.0.0
+flask-cors>=4.0.0
+
+# HTTP client (for Todoist API)
+requests>=2.31.0

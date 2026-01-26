@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PiTodoist</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Top Row: Navigation and Task Display -->
+        <div class="top-row">
+            <button id="btn-previous" class="btn btn-nav" title="Previous task">
+                <-
+            </button>
+            <div class="task-display" id="task-display">
+                <h1 class="task-title" id="task-title">Loading...</h1>
+                <p class="task-description" id="task-description"></p>
+                <p class="task-meta" id="task-meta"></p>
+                <p class="task-time" id="task-time"></p>
+            </div>
+            <button id="btn-next" class="btn btn-nav" title="Next task">
+                ->
+            </button>
+        </div>
+
+        <!-- Bottom Row: Action Buttons -->
+        <div class="bottom-row">
+            <button id="btn-play" class="btn btn-action" title="Start task">
+                ▶
+            </button>
+            <button id="btn-stop" class="btn btn-action" title="Stop task" disabled>
+                ||
+            </button>
+            <button id="btn-done" class="btn btn-action btn-done" title="Mark done / Toggle view">
+                ✓
+            </button>
+        </div>
+    </div>
+
+    <!-- Message display for success/error feedback -->
+    <div id="message" class="message"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
