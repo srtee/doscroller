@@ -345,6 +345,9 @@ async function initialize() {
         // Get API token
         state.apiToken = await getApiToken();
 
+        // Sync tasks with Todoist first
+        await syncTasks();
+
         // Fetch tasks
         const [tasks, completedTasks, activeSummary] = await Promise.all([
             fetchTasks(),
