@@ -1,4 +1,4 @@
-/* PiTodoist - Styles */
+/* DoScroll - Styles */
 
 /* Reset and base styles */
 * {
@@ -76,6 +76,25 @@ body {
     gap: 1.5rem;
 }
 
+/* Utility row: sync and export */
+.utility-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+/* Utility buttons */
+.btn-utility {
+    background-color: #9E9E9E;
+    color: white;
+    font-size: 18px;
+    padding: 12px 20px;
+    min-width: 60px;
+    min-height: 50px;
+}
+
 /* Button base styles */
 .btn {
     font-size: 24px;
@@ -113,14 +132,13 @@ body {
     font-weight: bold;
 }
 
-.btn-action#btn-play {
+.btn-action#btn-toggle {
     background-color: #4CAF50;
     color: white;
 }
 
-.btn-action#btn-stop {
+.btn-action#btn-toggle.active {
     background-color: #FF9800;
-    color: white;
 }
 
 .btn-action#btn-done {

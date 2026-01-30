@@ -1,10 +1,10 @@
-# PiTodoist
+# DoScroll
 
 A client-side task manager and time tracker that works directly with Todoist.
 
 ## Overview
 
-PiTodoist is a purely browser-contained application that:
+DoScroll is a purely browser-contained application that:
 
 - Fetches tasks directly from Todoist API
 - Tracks time spent on tasks with start/stop timers
@@ -60,9 +60,9 @@ All data is stored in the browser using localStorage under these keys:
 
 | Key | Purpose |
 |-----|---------|
-| `pitodoist:token` | Todoist API token |
-| `pitodoist:active` | Active time entry `{t, s}` or `null` |
-| `pitodoist:entries` | Array of completed time entries `[{t, s, e}]` |
+| `doscroll:token` | Todoist API token |
+| `doscroll:active` | Active time entry `{t, s}` or `null` |
+| `doscroll:entries` | Array of completed time entries `[{t, s, e}]` |
 
 Entry structure:
 - `t` - Task ID

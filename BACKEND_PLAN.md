@@ -1,8 +1,8 @@
-# PiTodoist Project Plan
+# DoScroll Project Plan
 
 ## Project Overview
 
-PiTodoist is a Python project to maintain an efficient local copy of Todoist tasks and provide functionality for task management, time tracking, and state management. The system will run locally and interact with Todoist's data, allowing users to start/stop work on tasks, track time, and mark tasks as complete.
+DoScroll is a Python project to maintain an efficient local copy of Todoist tasks and provide functionality for task management, time tracking, and state management. The system will run locally and interact with Todoist's data, allowing users to start/stop work on tasks, track time, and mark tasks as complete.
 
 ## Goals
 
@@ -62,7 +62,7 @@ A small state file tracking current application state:
 ### 2. Directory Structure (Proposed)
 
 ```
-PiTodoist/
+DoScroll/
 ├── data/
 │   ├── tasks.json           # Local task cache
 │   ├── time_tracking.json   # Time tracking records

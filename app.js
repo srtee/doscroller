@@ -1,11 +1,11 @@
-// PiTodoist - Client-Side Frontend Application
+// DoScroll - Client-Side Frontend Application
 
 // ===== STORAGE LAYER =====
 
 const STORAGE_KEYS = {
-    TOKEN: 'pitodoist:token',
-    ACTIVE: 'pitodoist:active',
-    ENTRIES: 'pitodoist:entries'
+    TOKEN: 'doscroll:token',
+    ACTIVE: 'doscroll:active',
+    ENTRIES: 'doscroll:entries'
 };
 
 const Storage = {
@@ -368,17 +368,31 @@ function updateTaskDisplay() {
 }
 
 function updateButtonStates() {
-    const playBtn = document.getElementById('btn-play');
-    const stopBtn = document.getElementById('btn-stop');
+    const toggleBtn = document.getElementById('btn-toggle');
+    const prevBtn = document.getElementById('btn-previous');
+    const nextBtn = document.getElementById('btn-next');
 
     const currentTask = getCurrentTask();
     const isActive = currentTask && currentTask.id === state.activeTaskId;
 
-    // Play button: disabled if current task is already active
-    playBtn.disabled = isActive || !currentTask;
+    // Toggle button: disabled if no current task
+    toggleBtn.disabled = !currentTask;
 
-    // Stop button: enabled only if a task is active
-    stopBtn.disabled = !state.activeTaskId;
+    // Update toggle button icon and state
+    const icon = toggleBtn.querySelector('i');
+    if (isActive) {
+        icon.className = 'fa-solid fa-pause';
+        toggleBtn.classList.add('active');
+        toggleBtn.title = 'Stop task';
+    } else {
+        icon.className = 'fa-solid fa-play';
+        toggleBtn.classList.remove('active');
+        toggleBtn.title = 'Start task';
+    }
+
+    // Disable navigation buttons when a task is active
+    prevBtn.disabled = isActive;
+    nextBtn.disabled = isActive;
 }
 
 function updateActiveTaskState(activeSummary) {
@@ -407,107 +421,124 @@ function handleNext() {
     updateTaskDisplay();
 }
 
-async function handlePlay() {
+async function handleToggle() {
     const task = getCurrentTask();
     if (!task) return;
 
+    const isActive = task.id === state.activeTaskId;
+
     try {
-        await startTask(task.id);
-        const active = Storage.getActive();
-        state.activeTaskId = active ? active.t : null;
+        if (isActive) {
+            await stopTask(task.id);
+            state.activeTaskId = null;
+            showMessage('Task stopped');
+        } else {
+            await startTask(task.id);
+            const active = Storage.getActive();
+            state.activeTaskId = active ? active.t : null;
+            showMessage('Task started');
+        }
         updateButtonStates();
-        showMessage('Task started');
     } catch (error) {
         showMessage(error.message, 'error');
     }
 }
-
-async function handleStop() {
-    const task = getCurrentTask();
-    if (!task) return;
-
-    try {
-        await stopTask(task.id);
-        state.activeTaskId = null;
-        updateButtonStates();
-        showMessage('Task stopped');
-    } catch (error) {
-        showMessage(error.message, 'error');
-    }
-}
-
-// Done button click handler with double-click detection
-let doneClickTimeout = null;
 
 function handleDone() {
     const task = getCurrentTask();
     if (!task) return;
 
-    // Clear any existing timeout
-    if (doneClickTimeout) {
-        clearTimeout(doneClickTimeout);
-        doneClickTimeout = null;
-    }
+    // Complete the task
+    completeTask(task.id).then(() => {
+        state.activeTaskId = null;
 
-    // Set timeout for single-click action
-    doneClickTimeout = setTimeout(async () => {
-        // Single-click: complete the task
-        try {
-            await completeTask(task.id);
-            state.activeTaskId = null;
-
-            // Remove from current list
-            const list = state.viewingDone ? state.doneTaskList : state.taskList;
-            const index = list.findIndex(t => t.id === task.id);
-            if (index !== -1) {
-                list.splice(index, 1);
-            }
-
-            // Move to next task
-            if (state.viewingDone) {
-                state.currentIndex = Math.min(state.currentIndex, list.length - 1);
-            } else {
-                state.currentIndex = state.currentIndex % list.length;
-            }
-
-            updateTaskDisplay();
-            updateButtonStates();
-            showMessage('Task completed!');
-        } catch (error) {
-            showMessage(error.message, 'error');
+        // Remove from current list
+        const list = state.viewingDone ? state.doneTaskList : state.taskList;
+        const index = list.findIndex(t => t.id === task.id);
+        if (index !== -1) {
+            list.splice(index, 1);
         }
 
-        doneClickTimeout = null;
-    }, 300);
-}
-
-function handleDoneDoubleClick() {
-    // Double-click: toggle done view
-    if (doneClickTimeout) {
-        clearTimeout(doneClickTimeout);
-        doneClickTimeout = null;
-    }
-
-    toggleDoneView();
-}
-
-async function toggleDoneView() {
-    state.viewingDone = !state.viewingDone;
-    state.currentIndex = 0;
-
-    if (state.viewingDone) {
-        // Refresh completed tasks
-        try {
-            await syncTasks();
-        } catch (error) {
-            showMessage(error.message, 'error');
-            state.viewingDone = false;
-            return;
+        // Move to next task
+        if (state.viewingDone) {
+            state.currentIndex = Math.min(state.currentIndex, list.length - 1);
+        } else {
+            state.currentIndex = state.currentIndex % list.length;
         }
-    }
 
-    updateTaskDisplay();
-    updateButtonStates();
+        updateTaskDisplay();
+        updateButtonStates();
+        showMessage('Task completed!');
+    }).catch(error => {
+        showMessage(error.message, 'error');
+    });
+}
+
+async function handleSync() {
+    try {
+        await syncTasks();
+        showMessage('Tasks synced from Todoist');
+    } catch (error) {
+        showMessage(error.message, 'error');
+    }
+}
+
+async function handleExport() {
+    try {
+        // First sync to get the latest task data
+        await syncTasks();
+
+        // Build export data with task name, duration, and completion status
+        const exportData = [];
+        const processedTaskIds = new Set();
+
+        // Process all tasks (both incomplete and completed)
+        const allTasks = [...state.taskList, ...state.doneTaskList];
+
+        for (const task of allTasks) {
+            if (processedTaskIds.has(task.id)) continue;
+            processedTaskIds.add(task.id);
+
+            const totalSeconds = Storage.getTotalTimeForTask(task.id);
+            const isComplete = task.is_completed || false;
+            const duration = formatTime(totalSeconds);
+
+            exportData.push({
+                taskName: task.content || 'Unnamed task',
+                durationSeconds: totalSeconds,
+                durationFormatted: duration,
+                isComplete: isComplete ? 'Complete' : 'Incomplete'
+            });
+        }
+
+        // Sort by duration descending
+        exportData.sort((a, b) => b.durationSeconds - a.durationSeconds);
+
+        // Generate CSV
+        let csv = 'Task Name,Duration,Status\n';
+        for (const row of exportData) {
+            // Escape task name if it contains commas or quotes
+            const escapedName = row.taskName.includes(',') || row.taskName.includes('"')
+                ? `"${row.taskName.replace(/"/g, '""')}"`
+                : row.taskName;
+            csv += `${escapedName},${row.durationFormatted},${row.isComplete}\n`;
+        }
+
+        // Create download
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `doscroll-time-tracking-${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        showMessage('CSV exported successfully');
+    } catch (error) {
+        showMessage(error.message, 'error');
+    }
 }
 
 // ===== UTILITY FUNCTIONS =====
@@ -611,10 +642,10 @@ async function initialize() {
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-previous').addEventListener('click', handlePrevious);
     document.getElementById('btn-next').addEventListener('click', handleNext);
-    document.getElementById('btn-play').addEventListener('click', handlePlay);
-    document.getElementById('btn-stop').addEventListener('click', handleStop);
+    document.getElementById('btn-toggle').addEventListener('click', handleToggle);
     document.getElementById('btn-done').addEventListener('click', handleDone);
-    document.getElementById('btn-done').addEventListener('dblclick', handleDoneDoubleClick);
+    document.getElementById('btn-sync').addEventListener('click', handleSync);
+    document.getElementById('btn-export').addEventListener('click', handleExport);
 
     // Start initialization
     initialize();

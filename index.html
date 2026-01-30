@@ -3,15 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PiTodoist</title>
+    <title>DoScroll</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body>
     <div class="container">
         <!-- Top Row: Navigation and Task Display -->
         <div class="top-row">
             <button id="btn-previous" class="btn btn-nav" title="Previous task">
-                <-
+                <i class="fa-solid fa-chevron-left"></i>
             </button>
             <div class="task-display" id="task-display">
                 <h1 class="task-title" id="task-title">Loading...</h1>
@@ -20,20 +21,27 @@
                 <p class="task-time" id="task-time"></p>
             </div>
             <button id="btn-next" class="btn btn-nav" title="Next task">
-                ->
+                <i class="fa-solid fa-chevron-right"></i>
             </button>
         </div>
 
         <!-- Bottom Row: Action Buttons -->
         <div class="bottom-row">
-            <button id="btn-play" class="btn btn-action" title="Start task">
-                ▶
+            <button id="btn-toggle" class="btn btn-action btn-toggle" title="Start/Stop task">
+                <i class="fa-solid fa-play"></i>
             </button>
-            <button id="btn-stop" class="btn btn-action" title="Stop task" disabled>
-                ||
+            <button id="btn-done" class="btn btn-action btn-done" title="Mark done">
+                <i class="fa-solid fa-check"></i>
             </button>
-            <button id="btn-done" class="btn btn-action btn-done" title="Mark done / Toggle view">
-                ✓
+        </div>
+
+        <!-- Utility Row: Sync and Export -->
+        <div class="utility-row">
+            <button id="btn-sync" class="btn btn-utility" title="Sync tasks from Todoist">
+                <i class="fa-solid fa-rotate"></i>
+            </button>
+            <button id="btn-export" class="btn btn-utility" title="Export time tracking data as CSV">
+                <i class="fa-solid fa-download"></i>
             </button>
         </div>
     </div>

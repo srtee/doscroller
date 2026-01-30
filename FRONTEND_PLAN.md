@@ -1,7 +1,7 @@
 # Frontend Documentation Plan
 
 ## Overview
-This document outlines the plan for building a minimalistic HTML+JavaScript frontend that communicates with the PiTodoist Python backend via a web API layer.
+This document outlines the plan for building a minimalistic HTML+JavaScript frontend that communicates with the DoScroll Python backend via a web API layer.
 
 ---
 
@@ -216,7 +216,7 @@ When viewing done tasks, each task should show:
 **Location:** At project root for serving by web server.
 
 ```
-# Root directory (PiTodoist/)
+# Root directory (DoScroll/)
 index.html          # Main HTML file
 styles.css          # Minimalistic styling
 app.js              # All application logic

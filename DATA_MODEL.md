@@ -1,8 +1,8 @@
-# PiTodoist Data Model
+# DoScroll Data Model
 
 ## Overview
 
-This document describes the proposed data structures for PiTodoist, including the local task cache, time tracking records, and application state.
+This document describes the proposed data structures for DoScroll, including the local task cache, time tracking records, and application state.
 
 ---
 
@@ -34,12 +34,12 @@ A single task as stored locally.
 ```json
 {
   "id": "1234567890",
-  "content": "Write PiTodoist documentation",
+  "content": "Write DoScroll documentation",
   "description": "Create initial markdown files planning the system",
   "due_date": "2026-01-30T18:00:00Z",
   "priority": 4,
   "project_id": "9876543210",
-  "project_name": "PiTodoist",
+  "project_name": "DoScroll",
   "labels": ["planning", "documentation"],
   "is_completed": false,
   "completed_at": null,
@@ -97,7 +97,7 @@ A record of a single work session on a task.
 
 ## 3. Application State Object
 
-Current runtime state of the PiTodoist application.
+Current runtime state of the DoScroll application.
 
 ### Schema
 
@@ -212,8 +212,8 @@ Time reports are exported to CSV with the following columns:
 
 ```csv
 task_id,task_content,entry_id,start_time,stop_time,duration_seconds,duration_human,notes
-1234567890,Write PiTodoist documentation,time-001,2026-01-26T09:00:00Z,2026-01-26T11:30:00Z,9000,2h 30m,Initial planning session
-1234567890,Write PiTodoist documentation,time-002,2026-01-26T14:00:00Z,ACTIVE,0,0m,
+1234567890,Write DoScroll documentation,time-001,2026-01-26T09:00:00Z,2026-01-26T11:30:00Z,9000,2h 30m,Initial planning session
+1234567890,Write DoScroll documentation,time-002,2026-01-26T14:00:00Z,ACTIVE,0,0m,
 ```
 
 ---

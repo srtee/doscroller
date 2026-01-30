@@ -1,4 +1,4 @@
-# PiTodoist - Storage Optimization Analysis
+# DoScroll - Storage Optimization Analysis
 
 ## Current Storage Architecture
 
@@ -184,8 +184,8 @@ If no active task: `{"a": null}`
 
 Given the minimized requirements:
 
-| Option | Capacity | Recommended for PiTodoist |
-|--------|----------|--------------------------|
+| Option | Capacity | Recommended for DoScroll |
+|--------|----------|-------------------------|
 | Cookies | ~4KB | ❌ Too small |
 | localStorage | ~5-10MB | ✅ More than sufficient |
 | sessionStorage | ~5-10MB | ⚠ Cleared on close (bad for time entries) |
@@ -200,8 +200,8 @@ Given the minimized requirements:
 1. Remove all task caching from storage
 2. Consolidate time entry format (shortened keys, unix timestamps)
 3. Consolidate active state into time entries
-4. Store active entry at a special key (e.g., `pitodoist:active`)
-5. Store historical entries as array under `pitodoist:entries`
+4. Store active entry at a special key (e.g., `doscroll:active`)
+5. Store historical entries as array under `doscroll:entries`
 6. Remove `last_sync` tracking
 
 ---
@@ -211,9 +211,9 @@ Given the minimized requirements:
 ### localStorage keys:
 
 ```
-pitodoist:token          - Todoist API token (string)
-pitodoist:active         - Active time entry or null (object)
-pitodoist:entries        - Array of completed time entries (array)
+doscroll:token          - Todoist API token (string)
+doscroll:active         - Active time entry or null (object)
+doscroll:entries        - Array of completed time entries (array)
 ```
 
 ### Entry object structure:
