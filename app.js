@@ -1,4 +1,123 @@
-// PiTodoist - Frontend Application
+// PiTodoist - Client-Side Frontend Application
+
+// ===== STORAGE LAYER =====
+
+const STORAGE_KEYS = {
+    TOKEN: 'pitodoist:token',
+    ACTIVE: 'pitodoist:active',
+    ENTRIES: 'pitodoist:entries'
+};
+
+const Storage = {
+    getToken() {
+        return localStorage.getItem(STORAGE_KEYS.TOKEN);
+    },
+
+    setToken(token) {
+        localStorage.setItem(STORAGE_KEYS.TOKEN, token);
+    },
+
+    getActive() {
+        const data = localStorage.getItem(STORAGE_KEYS.ACTIVE);
+        return data ? JSON.parse(data) : null;
+    },
+
+    setActive(entry) {
+        if (entry === null) {
+            localStorage.removeItem(STORAGE_KEYS.ACTIVE);
+        } else {
+            localStorage.setItem(STORAGE_KEYS.ACTIVE, JSON.stringify(entry));
+        }
+    },
+
+    getEntries() {
+        const data = localStorage.getItem(STORAGE_KEYS.ENTRIES);
+        return data ? JSON.parse(data) : [];
+    },
+
+    saveEntries(entries) {
+        localStorage.setItem(STORAGE_KEYS.ENTRIES, JSON.stringify(entries));
+    },
+
+    addEntry(entry) {
+        const entries = this.getEntries();
+        entries.push(entry);
+        this.saveEntries(entries);
+    },
+
+    // Calculate duration in seconds from timestamps
+    calculateDuration(startTs, endTs) {
+        if (!endTs) {
+            // Active session - calculate current duration
+            return Math.floor((Date.now() / 1000) - startTs);
+        }
+        return endTs - startTs;
+    },
+
+    // Get total time for a task ID
+    getTotalTimeForTask(taskId) {
+        const entries = this.getEntries();
+        const active = this.getActive();
+
+        let total = 0;
+
+        // Sum completed entries
+        for (const entry of entries) {
+            if (entry.t === taskId) {
+                total += entry.e - entry.s;
+            }
+        }
+
+        // Add active entry if it's this task
+        if (active && active.t === taskId) {
+            total += this.calculateDuration(active.s, null);
+        }
+
+        return total;
+    }
+};
+
+// ===== TODOIST API =====
+
+const Todoist = {
+    BASE_URL: 'https://api.todoist.com/rest/v2',
+
+    async request(endpoint, options = {}) {
+        const token = Storage.getToken();
+        const url = `${this.BASE_URL}${endpoint}`;
+        const headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            ...options.headers
+        };
+
+        try {
+            const response = await fetch(url, { ...options, headers });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            if (response.status === 204) {
+                return null;
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Todoist API Error:', error);
+            throw error;
+        }
+    },
+
+    async getTasks(filter = null) {
+        let url = '/tasks';
+        if (filter) {
+            url += `?filter=${encodeURIComponent(filter)}`;
+        }
+        return this.request(url);
+    },
+
+    async closeTask(taskId) {
+        return this.request(`/tasks/${taskId}/close`, { method: 'POST' });
+    }
+};
 
 // ===== STATE MANAGEMENT =====
 
@@ -7,26 +126,141 @@ const state = {
     doneTaskList: [],
     currentIndex: 0,
     viewingDone: false,
-    activeTaskId: null,
-    apiToken: null,
-    lastPollTime: 0
+    activeTaskId: null
 };
 
-// ===== API COMMUNICATION =====
+// ===== TASK MANAGEMENT =====
+
+const TaskManager = {
+    async syncTasks() {
+        try {
+            const tasks = await Todoist.getTasks();
+            // Filter into incomplete and completed
+            state.taskList = tasks.filter(t => !t.is_completed);
+            state.doneTaskList = tasks.filter(t => t.is_completed);
+            // Sort completed by newest first
+            state.doneTaskList.sort((a, b) => {
+                const aTime = b.completed_at ? new Date(b.completed_at).getTime() : 0;
+                const bTime = a.completed_at ? new Date(a.completed_at).getTime() : 0;
+                return aTime - bTime;
+            });
+            return true;
+        } catch (error) {
+            console.error('Sync failed:', error);
+            return false;
+        }
+    },
+
+    async startWork(taskId) {
+        // First sync to get latest data
+        await this.syncTasks();
+
+        // Check if a task is already active
+        const active = Storage.getActive();
+        if (active) {
+            throw new Error('A task is already active');
+        }
+
+        // Start the timer
+        const now = Math.floor(Date.now() / 1000);
+        const entry = { t: taskId, s: now };
+        Storage.setActive(entry);
+        state.activeTaskId = taskId;
+
+        return true;
+    },
+
+    stopWork(taskId) {
+        const active = Storage.getActive();
+        if (!active || active.t !== taskId) {
+            throw new Error('This task is not active');
+        }
+
+        // Calculate end time
+        const endTs = Math.floor(Date.now() / 1000);
+        const entry = { ...active, e: endTs };
+
+        // Save as completed entry
+        Storage.addEntry(entry);
+
+        // Clear active
+        Storage.setActive(null);
+        state.activeTaskId = null;
+
+        return true;
+    },
+
+    async completeTask(taskId) {
+        // Stop timer if active
+        const active = Storage.getActive();
+        if (active && active.t === taskId) {
+            this.stopWork(taskId);
+        }
+
+        // Mark complete on Todoist
+        await Todoist.closeTask(taskId);
+
+        // Refresh tasks
+        await this.syncTasks();
+    },
+
+    getActiveTaskSummary() {
+        const active = Storage.getActive();
+        if (!active) return null;
+
+        // Find task in list
+        const task = state.taskList.find(t => t.id === active.t);
+        if (!task) return null;
+
+        const duration = Storage.calculateDuration(active.s, null);
+
+        return {
+            task: task,
+            total_time_seconds: duration,
+            total_time_entries: 1,
+            is_active: true,
+            current_session_duration: duration,
+            time_entries: [{ entry_id: 'active', task_id: active.t, start_time: active.s, stop_time: null }]
+        };
+    },
+
+    getTaskSummary(taskId) {
+        const entries = Storage.getEntries();
+        const taskEntries = entries.filter(e => e.t === taskId);
+        const active = Storage.getActive();
+
+        const totalSeconds = Storage.getTotalTimeForTask(taskId);
+
+        const isActive = active && active.t === taskId;
+        const currentDuration = isActive ? Storage.calculateDuration(active.s, null) : 0;
+
+        return {
+            task: { id: taskId },
+            total_time_seconds: totalSeconds,
+            total_time_entries: taskEntries.length + (isActive ? 1 : 0),
+            is_active: isActive,
+            current_session_duration: currentDuration,
+            time_entries: taskEntries
+        };
+    }
+};
+
+// ===== API WRAPPER (for compatibility with existing UI code) =====
 
 async function apiRequest(endpoint, options = {}) {
-    const url = `/api${endpoint}`;
     const headers = {
         'Content-Type': 'application/json',
         ...options.headers
     };
 
-    if (state.apiToken && !headers['Authorization']) {
-        headers['Authorization'] = `Bearer ${state.apiToken}`;
+    // Add auth header if we have a token
+    const token = Storage.getToken();
+    if (token && !headers['Authorization']) {
+        headers['Authorization'] = `Bearer ${token}`;
     }
 
     try {
-        const response = await fetch(url, { ...options, headers });
+        const response = await fetch(endpoint, { ...options, headers });
         const data = await response.json();
 
         if (!data.success) {
@@ -40,36 +274,44 @@ async function apiRequest(endpoint, options = {}) {
     }
 }
 
+// Forward to Todoist or TaskManager
 async function fetchTasks() {
-    return apiRequest('/tasks');
+    await TaskManager.syncTasks();
+    return state.taskList;
 }
 
 async function fetchCompletedTasks() {
-    return apiRequest('/tasks/completed');
+    await TaskManager.syncTasks();
+    return state.doneTaskList;
 }
 
 async function fetchActiveTask() {
-    return apiRequest('/active');
+    return TaskManager.getActiveTaskSummary();
 }
 
 async function startTask(taskId) {
-    return apiRequest(`/start/${taskId}`, { method: 'POST' });
+    await TaskManager.startWork(taskId);
+    return TaskManager.getActiveTaskSummary();
 }
 
 async function stopTask(taskId) {
-    return apiRequest(`/stop/${taskId}`, { method: 'POST' });
+    TaskManager.stopWork(taskId);
+    return { stopped: true };
 }
 
 async function completeTask(taskId) {
-    return apiRequest(`/complete/${taskId}`, { method: 'POST' });
+    await TaskManager.completeTask(taskId);
+    return { completed: true };
 }
 
 async function fetchTaskTime(taskId) {
-    return apiRequest(`/time/${taskId}`);
+    const totalSeconds = Storage.getTotalTimeForTask(taskId);
+    return { task_id: taskId, total_seconds: totalSeconds };
 }
 
 async function syncTasks() {
-    return apiRequest('/sync');
+    const success = await TaskManager.syncTasks();
+    return { synced: success, task_count: state.taskList.length };
 }
 
 // ===== STATE UPDATES =====
@@ -140,11 +382,8 @@ function updateButtonStates() {
 }
 
 function updateActiveTaskState(activeSummary) {
-    if (activeSummary) {
-        state.activeTaskId = activeSummary.task.id;
-    } else {
-        state.activeTaskId = null;
-    }
+    const active = Storage.getActive();
+    state.activeTaskId = active ? active.t : null;
     updateButtonStates();
 }
 
@@ -174,7 +413,8 @@ async function handlePlay() {
 
     try {
         await startTask(task.id);
-        state.activeTaskId = task.id;
+        const active = Storage.getActive();
+        state.activeTaskId = active ? active.t : null;
         updateButtonStates();
         showMessage('Task started');
     } catch (error) {
@@ -256,15 +496,13 @@ async function toggleDoneView() {
     state.currentIndex = 0;
 
     if (state.viewingDone) {
-        // Load completed tasks if not already loaded
-        if (state.doneTaskList.length === 0) {
-            try {
-                state.doneTaskList = await fetchCompletedTasks();
-            } catch (error) {
-                showMessage(error.message, 'error');
-                state.viewingDone = false;
-                return;
-            }
+        // Refresh completed tasks
+        try {
+            await syncTasks();
+        } catch (error) {
+            showMessage(error.message, 'error');
+            state.viewingDone = false;
+            return;
         }
     }
 
@@ -301,14 +539,14 @@ function showMessage(message, type = 'success') {
 
 async function getApiToken() {
     // Check localStorage first
-    let token = localStorage.getItem('pitodoist_token');
+    let token = Storage.getToken();
     if (token) return token;
 
     // Check URL parameter
     const urlParams = new URLSearchParams(window.location.search);
     token = urlParams.get('token');
     if (token) {
-        localStorage.setItem('pitodoist_token', token);
+        Storage.setToken(token);
         // Remove token from URL
         window.history.replaceState({}, '', window.location.pathname);
         return token;
@@ -317,7 +555,7 @@ async function getApiToken() {
     // Prompt user
     token = prompt('Please enter your Todoist API token:');
     if (token) {
-        localStorage.setItem('pitodoist_token', token);
+        Storage.setToken(token);
         return token;
     }
 
@@ -327,12 +565,8 @@ async function getApiToken() {
 // ===== POLLING =====
 
 async function pollActiveTask() {
-    try {
-        const summary = await fetchActiveTask();
-        updateActiveTaskState(summary);
-    } catch (error) {
-        console.error('Polling error:', error);
-    }
+    // Just update local state - no server polling needed
+    updateActiveTaskState();
 
     // Poll every 20 seconds (since no timer display is shown)
     setTimeout(pollActiveTask, 20000);
@@ -343,26 +577,17 @@ async function pollActiveTask() {
 async function initialize() {
     try {
         // Get API token
-        state.apiToken = await getApiToken();
+        await getApiToken();
 
         // Sync tasks with Todoist first
         await syncTasks();
 
-        // Fetch tasks
-        const [tasks, completedTasks, activeSummary] = await Promise.all([
-            fetchTasks(),
-            fetchCompletedTasks(),
-            fetchActiveTask()
-        ]);
-
-        state.taskList = tasks;
-        state.doneTaskList = completedTasks;
-
-        // Resume active task if exists, otherwise show first incomplete task
-        if (activeSummary) {
-            state.activeTaskId = activeSummary.task.id;
+        // Set active task from localStorage if exists
+        const active = Storage.getActive();
+        if (active) {
+            state.activeTaskId = active.t;
             // Find active task in list and set index
-            const activeIndex = state.taskList.findIndex(t => t.id === state.activeTaskId);
+            const activeIndex = state.taskList.findIndex(t => t.id === active.t);
             if (activeIndex !== -1) {
                 state.currentIndex = activeIndex;
             }
