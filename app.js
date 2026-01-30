@@ -116,6 +116,13 @@ const Todoist = {
 
     async closeTask(taskId) {
         return this.request(`/tasks/${taskId}/close`, { method: 'POST' });
+    },
+
+    async addComment(taskId, content) {
+        return this.request('/comments', {
+            method: 'POST',
+            body: JSON.stringify({ task_id: taskId, content })
+        });
     }
 };
 
@@ -199,6 +206,18 @@ const TaskManager = {
 
         // Mark complete on Todoist
         await Todoist.closeTask(taskId);
+
+        // Add comment with total time spent
+        const totalSeconds = Storage.getTotalTimeForTask(taskId);
+        if (totalSeconds > 0) {
+            const formattedTime = formatTime(totalSeconds);
+            try {
+                await Todoist.addComment(taskId, `Total time: ${formattedTime}`);
+            } catch (error) {
+                // Comment is optional, don't fail if it doesn't work
+                console.error('Failed to add comment:', error);
+            }
+        }
 
         // Refresh tasks
         await this.syncTasks();

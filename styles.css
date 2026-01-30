@@ -193,4 +193,13 @@ body {
     .bottom-row {
         gap: 1rem;
     }
+
+    /* Rotate nav icons to up/down on mobile */
+    #btn-previous i {
+        transform: rotate(90deg);
+    }
+
+    #btn-next i {
+        transform: rotate(90deg);
+    }
 }
